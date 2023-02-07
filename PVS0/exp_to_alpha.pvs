@@ -1,0 +1,34 @@
+exp_to_alpha  % [ parameters ]
+		: THEORY
+
+  BEGIN
+
+  IMPORTING mf_pvs0_Turing_Completeness
+
+  expr2listsub(expr : mf_PVS0Expr) : RECURSIVE list[mf_PVS0Expr] =
+  cons(expr,
+     CASES expr OF
+           cnst(n) : (::),
+	   vr : (::),
+	   op2(n,e1,e2): append(expr2listsub(e1),expr2listsub(e2)),
+	   op1(n,e1): expr2listsub(e1),
+	   rec(n,e1): expr2listsub(e1),
+	   ite(e1,e2,e3): append(expr2listsub(e1),append(expr2listsub(e2),expr2listsub(e3)))
+      ENDCASES
+
+  )
+  MEASURE expr BY <<
+
+  listexpr2listsub(lexpr : list[mf_PVS0Expr]) : RECURSIVE list[mf_PVS0Expr] =
+  CASES lexpr OF
+        null: (::),
+	cons(h,t) : append(expr2listsub(h),listexpr2listsub(t))
+  ENDCASES
+  MEASURE length(lexpr)
+
+  subexpr_of(lexpr : list[mf_PVS0Expr]) : TYPE = (LAMBDA(expr : mf_PVS0Expr): member(expr,listexpr2listsub(lexpr)))
+
+  extra_letters : TYPE = {ite_s,rec_s,op1_s,op2_s,vr_s,I,Z,H}
+  alphabet_of(lexpr : list[mf_PVS0Expr]) : TYPE = [extra_letters + subexpr_of(lexpr)]
+
+  END exp_to_alpha

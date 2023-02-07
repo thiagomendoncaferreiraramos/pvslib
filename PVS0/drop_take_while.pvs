@@ -1,0 +1,55 @@
+drop_take_while   [ T : TYPE ]
+		: THEORY
+
+  BEGIN
+
+  dropWhile(P : [T->bool])(l : list[T]): RECURSIVE list[T] =
+  IF null?(l) THEN null
+  ELSIF P(car(l)) THEN dropWhile(P)(cdr(l))
+  ELSE cdr(l)
+  ENDIF
+  MEASURE length(l)
+
+  takeWhile(P : [T->bool])(l : list[T]): RECURSIVE list[T] =
+  IF null?(l) THEN null
+  ELSIF P(car(l)) THEN cons(car(l), takeWhile(P)(cdr(l)))
+  ELSE null
+  ENDIF		    
+  MEASURE length(l)
+
+  firstWhile(P : [T->bool])(l : list[T]): RECURSIVE list[T] =
+  IF null?(l) THEN null
+  ELSIF P(car(l)) THEN firstWhile(P)(cdr(l))
+  ELSE (: car(l) :)
+  ENDIF
+  MEASURE length(l)
+
+  diff(e : T)(i : T) : bool = (i /= e)
+
+  take_first_drop_while : LEMMA
+  FORALL (P : [T->bool], l :list[T]):
+  append(takeWhile(P)(l),
+         append(firstWhile(P)(l),dropWhile(P)(l))) = l
+  
+  takeWhile_P : LEMMA
+  FORALL (P : [T->bool], l :list[T]):
+  FORALL (i : below[length(takeWhile(P)(l))]): P(nth(takeWhile(P)(l),i))
+
+  member_firstWhile : LEMMA
+  FORALL(P : [T->bool], l :list[T]):
+  (EXISTS (e1 : T): member(e1, l) AND NOT P(e1)) =>
+  (EXISTS (e2 : T): car(firstWhile(P)(l)) =  e2)
+
+  firstWhile_diff_pred : LEMMA
+  FORALL(e : T, l :list[T]):
+  member(e,l) => firstWhile(diff(e))(l) = (: e :)
+
+  firstWhile_diff_pred_not_member : LEMMA
+  FORALL(e : T, l :list[T]):
+  (NOT member(e,l)) => firstWhile(diff(e))(l) = (:  :)
+
+  takeWhile_split : LEMMA
+  FORALL (P : [T->bool], l1,l2 :list[T]):
+  every(P)(l1) => takeWhile(P)(append(l1,l2)) = append(l1,takeWhile(P)(l2))
+
+  END drop_take_while

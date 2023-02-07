@@ -1,0 +1,25 @@
+filters_extra  [T : TYPE ]
+		: THEORY
+
+  BEGIN
+
+  % ASSUMING
+   % assuming declarations
+  % ENDASSUMING
+
+   filter_subset_list : LEMMA
+  FORALL(l : list[T], P : pred[T], i : below[length(filter(P)(l))]):
+  EXISTS(j : below[length(l)]):
+  nth(filter(P)(l),i) = nth(l,j)
+
+  filter_nth : LEMMA
+  FORALL(l : list[T], P : pred[T], i : below[length(l)]):
+  P(nth(l,i)) <=>
+  EXISTS(j : below[length(filter(P)(l))]):
+    nth(l,i) = nth(filter(P)(l),j)
+
+  filter_P : LEMMA
+  FORALL(l : list[T], P : pred[T], i : below[length(filter(P)(l))]):
+  P(nth(filter(P)(l),i))
+
+  END filters_extra

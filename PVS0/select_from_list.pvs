@@ -1,0 +1,57 @@
+select_from_list[ T : TYPE+ ]
+		: THEORY
+
+  BEGIN
+
+   search(i : T, l : list[T]) : RECURSIVE nat =
+         IF null?(l) THEN length(l)
+         ELSIF car(l) = i THEN 0 
+         ELSE 1 + search(i, cdr(l)) ENDIF
+   MEASURE length(l)
+   
+   select_from_list(l1 , l2 : list[T]): RECURSIVE list[nat]=
+   CASES l1 OF
+         null : null,
+	 cons(h,t): cons(search(h,l2),select_from_list(t,l2))
+   ENDCASES
+   MEASURE length(l1)
+
+  nth_search: LEMMA
+  FORALL(l : list[T], i : T| search(i,l) < length(l)) :
+  nth(l,search(i,l)) = i
+
+
+  IMPORTING structures@set_as_list
+
+  search_in_Alphabet: LEMMA
+  FORALL(Alphabet : (is_finite[T]), a : (Alphabet)):
+  search(a,set2list[T](Alphabet)) < length(set2list[T](Alphabet))
+
+  search_in : LEMMA
+  FORALL(l: list[T], x : T):
+   member(x,l) =>
+  search(x,l) < length(l)
+
+  select_from_list_proj: LEMMA
+  FORALL(l1,l2 : list[T], i : below[length(select_from_list(l1,l2))]):
+  (FORALL(j : below[length(l1)]): member(nth(l1,j),l2)) =>
+  nth(select_from_list(l1,l2),i) < length(l2)
+
+  occurrences(m : T)(l : list[T]): RECURSIVE nat =
+  IF null?(l) THEN 0
+  ELSIF car(l) = m THEN 1 + occurrences(m)(cdr(l))
+  ELSE occurrences(m)(cdr(l))
+  ENDIF
+  MEASURE length(l)
+
+
+  occurrences_append : LEMMA
+  FORALL(m : T, l1,l2 : list[T]):
+  occurrences(m)(append(l1,l2)) =
+  occurrences(m)(l1)+occurrences(m)(l2)
+
+  occurrences_predicate : LEMMA
+  FORALL(a : T, l : list[T], P : set[T]):
+  (NOT P(a) AND (FORALL(i : below[length(l)]) : P(nth(l,i)) ) ) =>
+  occurrences(a)(l) = 0
+END select_from_list

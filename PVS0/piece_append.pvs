@@ -1,0 +1,18 @@
+piece_append  [ T : TYPE ]
+		: THEORY
+
+  BEGIN
+
+  piece_append : LEMMA
+  FORALL (l1,l2,l3,l4 : list[T]):
+  append(l1,l2) = append(l3,l4) =>
+  ((EXISTS (l5 : list[T]): l3 = append(l1,l5)) OR
+  (EXISTS (l5 : list[T]): l4 = append(l5,l2)))
+
+  member_split : LEMMA
+  FORALL(t : T, l : list[T]):
+  member(t, l) =>
+  (EXISTS(l1,l2 : list[T]): NOT member(t,l2) AND l = append(l1,cons(t,l2)))
+
+  
+  END piece_append

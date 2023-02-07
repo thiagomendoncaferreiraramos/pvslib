@@ -1,0 +1,9 @@
+extra_iterate  % [ parameters ]
+		: THEORY
+
+  BEGIN
+
+  IMPORTING
+    orders@closure_ops
+
+  END extra_iterate

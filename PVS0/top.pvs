@@ -35,6 +35,7 @@ BEGIN
 	    fibo_pvs0,
 	    fibo_pvs,
 	    % PVS0 with multi functions
-	    mf_pvs0_top
+	    mf_pvs0_top,
+	    pcp_string_rewriting
 	    	    
 END top

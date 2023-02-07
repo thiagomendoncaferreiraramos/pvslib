@@ -1,0 +1,19 @@
+append_extra [ T : TYPE ]
+		: THEORY
+
+  BEGIN
+
+ IMPORTING structures@more_list_props[T]
+
+  append_eq_length_right : LEMMA
+  FORALL(l1,l2,l3,l4 : list[T] ):
+    (append(l1,l2) = append(l3,l4) AND
+    length(l1) = length(l3))
+    IFF (l2=l4 AND l1=l3)
+
+  append_eq_right : COROLLARY
+  FORALL(l,l1,l2 : list[T]):
+  append(l,l1) = append(l,l2) IFF
+  l1 = l2
+
+  END append_extra

@@ -1,0 +1,235 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%% This theory specifies the string rewriting systems and
+%% Thue systems
+%% 
+%%
+%% Authors: Thiago Mendonca Ferreira Ramos and Mauricio Ayala-Rincon
+%% Universidade de Brasilia
+%% Last modified: May 17 2022 by Thiago MF Ramos
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+string_rewriting  [ T : TYPE+, Alphabet : non_empty_finite_set[T]]
+		: THEORY
+
+  BEGIN
+
+    letter : TYPE = (Alphabet)
+    string : TYPE = list[letter]
+    no_empty_string : TYPE = (cons?[letter])
+    rewriting_rule : TYPE = [string,string]
+    no_empty_rr : TYPE = [no_empty_string,no_empty_string]
+    list_rewriting_rules : TYPE = list[rewriting_rule]
+    list_no_empty_rr : TYPE = list[no_empty_rr]
+
+  IMPORTING
+    orders@closure_ops
+    , orders@relation_iterate
+    , structures@more_list_props
+    ,structures@set_as_list[letter]
+    , select_from_list[letter]
+    , subtype_map
+    , map_identity
+
+    
+
+    % Rewriting relation over strings given by a list of rewrite rules. 
+    reduction_rel(r : list_rewriting_rules)(s1,s2 : string) : bool =
+    EXISTS(i : below[length(r)]): EXISTS(A,B : string):
+    s1 = append(A,append(nth(r,i)`1,B)) AND
+    s2 = append(A,append(nth(r,i)`2,B))
+
+    % Rewriting relation on a Thue system.
+    TS_reduction_rel(r : list_rewriting_rules) : pred[[string,string]] =
+    symmetric_closure(reduction_rel(r))
+
+    TS_congruence(r : list_rewriting_rules) : pred[[string,string]] =
+    preorder_closure(TS_reduction_rel(r))
+
+    
+    % Transforming a letter 'a' into a rewriting rule 'a->a'.
+    letter2rr(a : letter) : rewriting_rule = ((: a :),(: a :))
+    
+    % Transforming an alphabet {'a','b'...'z'} into the rewriting rule list
+    % ['a->a','b->b',...,'z->z'].
+    Alpha2lrr: list_rewriting_rules = map(letter2rr)(set2list(Alphabet))
+
+    % Let 'r' := [a_0->b_0,a_1->b_1,...,a_n->b_n] be a list of rewriting rules, 
+    % and 'ind' := [i0,i1,...,im], a list of valid indices over that.
+    % The function 'append_from_rr1' appends the right hand of the rewriting
+    % rules selected by the indices as follows: a_{i0} a_{i1} ... a_{im}.
+    append_from_rr1(r : list_rewriting_rules, ind : list[below[length(r)]])
+    : RECURSIVE string=
+    CASES ind OF
+         null : null,
+	 cons(h,t) : append(nth(r,h)`1,append_from_rr1(r,t))
+    ENDCASES
+    MEASURE length(ind)
+
+    % The following piece of code behaves as similar as the previous one.
+    % Let 'r' := [a_0->b_0,a_1->b_1,...,a_n->b_n] be a list of rewriting rules,
+    % and 'ind' := [i0,i1,...,im], a list of valid indices over that.
+    % The function 'append_from_rr2' appends the left hand of the rewriting
+    % rules selected by the indices as follows: b_{i0} b_{i1} ... b_{im}.
+    append_from_rr2(r : list_rewriting_rules, ind : list[below[length(r)]])
+    : RECURSIVE string=
+    CASES ind OF
+         null : null,
+	 cons(h,t) : append(nth(r,h)`2,append_from_rr2(r,t))
+    ENDCASES
+    MEASURE length(ind)
+
+    % Let ('s1','s2') be a tuple of strings  that represents the
+    % rewriting rule s1->s2. The function 'exchange' exchanges
+    % 's1' and 's2' creating the following rewriting rule: 's2->s1'.
+    exchange(s1,s2 : string): rewriting_rule = (s2,s1)
+
+    % The function 'r_conv' inputs a list of rewriting rules
+    % and outputs another list exchanged the left hand by the
+    % right hand of all the rewriting rules.
+    % For example, let 'r' := [a_0->b_0,a_1->b_1,...,a_n->b_n] be
+    % an input. The function inputs 'r' and outputs
+    % [b_0->a_0,b_1->a_1,...,b_n->a_n]
+    r_conv(lrr : list_rewriting_rules): list_rewriting_rules =
+         map(exchange)(lrr)
+
+    % The alternative reduction relation verifies if the string 's1' can be
+    % rewrited in the string 's2' using rules in 'r' such that the rules
+    % can be applied in parallel in one step.
+    TS_reduction_rel_alt(r : list_rewriting_rules)(s1,s2 : string): bool=
+    EXISTS(ind : list[below[length(append(r,append(r_conv(r),Alpha2lrr)))]]) :
+    
+    s1 = append_from_rr1(append(r,append(r_conv(r),Alpha2lrr)),ind) AND
+    s2 = append_from_rr2(append(r,append(r_conv(r),Alpha2lrr)),ind)
+
+
+    TS_congruence_alt(r : list_rewriting_rules) : pred[[string,string]] =
+    transitive_closure(TS_reduction_rel_alt(r))
+
+
+    append_from_rr1_append : LEMMA
+    FORALL(A,B : list_rewriting_rules,ind : list[below[length(A)]]):
+    append_from_rr1(append(A,B),ind) = append_from_rr1(A,ind)
+
+    append_from_rr2_append : LEMMA
+    FORALL(A,B : list_rewriting_rules,ind : list[below[length(A)]]):
+    append_from_rr2(append(A,B),ind) = append_from_rr2(A,ind)
+
+    append_from_rr1_append2 : LEMMA
+    FORALL(A,B : list_rewriting_rules,ind : list[below[length(B)]]):
+    append_from_rr1(append(A,B),map[below[length(B)],below[length(append(A,B))]](LAMBDA(i : nat): i+length(A))(ind)) = append_from_rr1(B,ind)
+
+    append_from_rr2_append2 : LEMMA
+    FORALL(A,B : list_rewriting_rules,ind : list[below[length(B)]]):
+    append_from_rr2(append(A,B),map[below[length(B)],below[length(append(A,B))]](LAMBDA(i : nat): i+length(A))(ind)) = append_from_rr2(B,ind)
+
+    append_from_rr1_split: LEMMA
+    FORALL(r : list_rewriting_rules, ind1,ind2 : list[below[length(r)]]):
+    append_from_rr1(r,append(ind1,ind2)) =
+    append(append_from_rr1(r,ind1),append_from_rr1(r,ind2))
+
+    append_from_rr2_split: LEMMA
+    FORALL(r : list_rewriting_rules, ind1,ind2 : list[below[length(r)]]):
+    append_from_rr2(r,append(ind1,ind2)) =
+    append(append_from_rr2(r,ind1),append_from_rr2(r,ind2))
+
+    ind_rr_conv(len,len2: nat)(ind :below[len+len+len2]) : below[len+len+len2]=
+    IF len > ind THEN ind+len
+    ELSIF len + len > ind THEN ind - len
+    ELSE ind
+    ENDIF
+
+    ind_rr_conv_identity : LEMMA
+    FORALL(len,len2 : nat, ind : below[len+len+len2]):
+    ind_rr_conv(len,len2) o ind_rr_conv(len,len2) = (LAMBDA(ind : below[len+len+len2]): ind)
+
+    append_from_rr12rr2 : LEMMA
+    FORALL(r : list_rewriting_rules, ind : list[below[length(append(r,append(r_conv(r),Alpha2lrr)))]]):
+    append_from_rr1(append(r,append(r_conv(r),Alpha2lrr)),ind) =
+    append_from_rr2(append(r,append(r_conv(r),Alpha2lrr)),map(ind_rr_conv(length(r),length(Alpha2lrr)))(ind))
+
+    append_from_rr22rr1 : LEMMA
+    FORALL(r : list_rewriting_rules, ind : list[below[length(append(r,append(r_conv(r),Alpha2lrr)))]]):
+    append_from_rr2(append(r,append(r_conv(r),Alpha2lrr)),ind) =
+    append_from_rr1(append(r,append(r_conv(r),Alpha2lrr)),map(ind_rr_conv(length(r),length(Alpha2lrr)))(ind))
+
+    TS_reduction_rel_alt_symmetric : LEMMA
+    FORALL(r : list_rewriting_rules):
+    symmetric?(TS_reduction_rel_alt(r))
+    
+
+    TS_reduction_rel_alt_split : LEMMA
+    FORALL(r : list_rewriting_rules, A,B,C,D : string):
+    TS_reduction_rel_alt(r)(A,C) AND  TS_reduction_rel_alt(r)(B,D) =>
+    TS_reduction_rel_alt(r)(append(A,B),append(C,D))
+
+    
+    
+    Alpha2lrr_select_from_list1 : LEMMA
+    FORALL(A : string):
+    append_from_rr1(Alpha2lrr, select_from_list(A,set2list(Alphabet)))=
+    A
+
+    Alpha2lrr_select_from_list2 : LEMMA
+    FORALL(A : string):
+    append_from_rr2(Alpha2lrr, select_from_list(A,set2list(Alphabet)))=
+    A
+
+    TS_reduction_rel_alt_reflexive : LEMMA
+    FORALL(r : list_rewriting_rules):
+    reflexive?(TS_reduction_rel_alt(r))
+
+    TS_congruence_context_closed : LEMMA
+    FORALL(A,B,s1,s2: string, r : list_rewriting_rules):
+    TS_congruence(r)(s1,s2) =>
+    TS_congruence(r)(append(A,append(s1,B)),append(A,append(s2,B)))
+
+    TS_congruence_monotone : CONJECTURE
+    FORALL(A,s1,s2: string, r : list_rewriting_rules):
+    TS_congruence(r)(s1,s2) =>
+    TS_congruence(r)(append(A,s1),append(A,s2))
+
+    subset_alt: LEMMA
+    FORALL(r : list_rewriting_rules):
+    subset?(reduction_rel(r),TS_reduction_rel_alt(r))
+
+    alt_subset: LEMMA
+    FORALL(r : list_rewriting_rules):
+    subset?(TS_reduction_rel_alt(r),TS_congruence(r))
+
+    TS_congruence_subset_alt: LEMMA
+    FORALL(r : list_rewriting_rules):
+    subset?(TS_congruence(r),TS_congruence_alt(r))
+
+    TS_congruence_alt_subset: LEMMA
+    FORALL(r : list_rewriting_rules):
+    subset?(TS_congruence_alt(r),TS_congruence(r))
+
+    TS_congruence_equality: COROLLARY
+    TS_congruence = TS_congruence_alt
+
+    TS_congruence_alt_context_closed: COROLLARY
+    FORALL(A,B,s1,s2: string, r : list_rewriting_rules):
+    TS_congruence_alt(r)(s1,s2) =>
+    TS_congruence_alt(r)(append(A,append(s1,B)),append(A,append(s2,B)))
+
+    TS_congruence_alt_split : COROLLARY
+    FORALL(r : list_rewriting_rules, A,B,C,D : string):
+    TS_congruence_alt(r)(A,C) AND  TS_congruence_alt(r)(B,D) =>
+    TS_congruence_alt(r)(append(A,B),append(C,D))
+
+    IMPORTING mf_pvs0_Rices_Theorem_Corollaries
+
+
+    termination_reduces_congruence: LEMMA
+    EXISTS(redu_function:
+		[partial_recursive->[list_rewriting_rules,string,string]]):
+    FORALL(pvs0 : partial_recursive):
+    LET r = redu_function(pvs0)`1,
+    	A = redu_function(pvs0)`2,
+	B = redu_function(pvs0)`3 IN
+    terminating?(pvs0) <=> TS_congruence(r)(A,B)
+    
+    
+
+    
+  END string_rewriting

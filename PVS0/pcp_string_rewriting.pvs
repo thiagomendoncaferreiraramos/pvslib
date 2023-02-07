@@ -1,0 +1,314 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%% This theory formalizes the reduction from congruence in Thue
+%% systems to found a solution in Post Correspondence Problem (PCP).
+%% 
+%%
+%% Thiago Mendonca Ferreira Ramos and Mauricio Ayala-Rincon
+%% Universidade de Brasilia
+%% Last modified: 18 Oct 2022 by Thiago M F Ramos
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+pcp_string_rewriting  [ T : TYPE+, Alphabet : non_empty_finite_set[T]]
+		: THEORY
+
+  BEGIN
+
+ % Forall 'a' in the Alphabet used in the Thue system the
+ % PCP_Alphabet is enriched with 'a*'. Also, it contains special
+ % symbols 'A', 'B', 'b', 'e'.
+ % The symbols 'A' and 'B' separete words from dominoes "game".
+ % The symbol 'b' forces that a piece starts the game. The symbol
+ % 'e', ends the game.
+ % In the comments, the separator 'A' is represented by '#';
+ % 'B', by '#*'; 'b', by '{' ; and 'e' by '}'.
+ % Notice that PCP_Alphabet has a type build as a sum of types.
+  extra_letter : TYPE = {A,B,b,e}
+  PCP_Alphabet : TYPE = [extra_letter+(Alphabet)+(Alphabet)]
+ 
+% The begining and ending letter in a piece fitting.
+   bl: PCP_Alphabet = IN_1(b)
+   el: PCP_Alphabet = IN_1(e)
+
+
+ % The function 'q' is used to prove the TCC that PCP_Alphabet is finite.
+ % Indeed, it has 4 + 2|Alphabet| inhabitants.
+  q(N : nat, f : [(Alphabet)->below[N]])(x : (fullset[PCP_Alphabet])) : below[4+2*N] =
+     CASES x OF
+          IN_1(a) : IF a = A THEN 0
+	  	    ELSIF a = B THEN 1
+		    ELSIF a = e THEN 2
+		    ELSE 3 ENDIF,
+          IN_2(a) : 4+f(a),
+          IN_3(a) : 4 + N + f(a)
+     ENDCASES
+
+  IMPORTING string_rewriting[T,Alphabet]
+            , pcp[PCP_Alphabet,fullset]
+           ,structures@set_as_list[(Alphabet)]
+           , select_from_list[(Alphabet)]
+	   , select_from_list[(PCP_Alphabet)]
+	   , structures@more_list_props
+           , subtype_map
+	   , subtype_length
+	   , filters_extra
+	   , append_extra
+	   , drop_take_while
+	   , piece_append[(PCP_Alphabet)]
+	   , piece_append
+
+
+
+ % Transform a letter 'a' into
+ %the pieces ('a','a*') and ('a*','a')
+   letter2Piece_1(a : (Alphabet)) : Piece =
+          ( ((:IN_2[PCP_Alphabet](a):)::list[PCP_Alphabet]),
+	    ((:IN_3[PCP_Alphabet](a):)::list[PCP_Alphabet]) )
+
+    letter2Piece_2(a : (Alphabet)) : Piece =
+         ( ((:IN_3[PCP_Alphabet](a):)::list[PCP_Alphabet]),
+	   ((:IN_2[PCP_Alphabet](a):)::list[PCP_Alphabet]) )
+
+  % Transforming a Thue's System alphabet
+  % into pieces.
+  % Let alpha := ['a','b',...,'z'] be a Thue's System alphabet.
+  % 'alphabet2domino' generates pieces :[(A,A*),(A*,A) | A in alpha]
+  alphabet2domino : (valid_domino?) =
+   append(map(letter2Piece_1)(set2list(Alphabet)),
+          map(letter2Piece_2)(set2list(Alphabet)) )
+
+
+    % The functions 'rule2Piece_n' transform a rewrinting_rule
+    % A->B into the pieces: (A,B*), (A*,B), (B,A*), (B*,A). 
+    rule2Piece_1(rr : rewriting_rule) : Piece =
+       ( map[(Alphabet),PCP_Alphabet](IN_2[PCP_Alphabet])(rr`1),
+         map[(Alphabet),PCP_Alphabet](IN_3[PCP_Alphabet])(rr`2) )
+
+    rule2Piece_2(rr : rewriting_rule) : Piece =
+       ( map[(Alphabet),PCP_Alphabet](IN_3[PCP_Alphabet])(rr`1),
+         map[(Alphabet),PCP_Alphabet](IN_2[PCP_Alphabet])(rr`2) )
+
+    rule2Piece_3(rr : rewriting_rule) : Piece =
+       ( map[(Alphabet),PCP_Alphabet](IN_2[PCP_Alphabet])(rr`2),
+         map[(Alphabet),PCP_Alphabet](IN_3[PCP_Alphabet])(rr`1) )
+
+    rule2Piece_4(rr : rewriting_rule) : Piece =
+       ( map[(Alphabet),PCP_Alphabet](IN_3[PCP_Alphabet])(rr`2),
+         map[(Alphabet),PCP_Alphabet](IN_2[PCP_Alphabet])(rr`1) )
+
+   % The function 'list_rew_rules2pcp' transforms a list
+   % of rewriting rules where once of sides is non-empty
+   % into a list of pieces together to a list of separator
+   % pieces.
+   list_rew_rules2pcp(l : list_no_empty_rr) : (valid_domino?) =
+   append( (: ((:IN_1[PCP_Alphabet](A):),(:IN_1[PCP_Alphabet](B):)),
+              ((:IN_1[PCP_Alphabet](B):),(:IN_1[PCP_Alphabet](A):))  :),
+   append(map(rule2Piece_1)(l),
+          append(map(rule2Piece_2)(l),
+	  append(map(rule2Piece_3)(l),
+	  map(rule2Piece_4)(l)))))
+
+  % The functions 'string2Piece_n' transform the strings of
+  % a congruence question into the first and last pieces.
+  % For example, the 'abc =? cb' the first function inputs
+  % 'abc' and outputs ( '{abc#*', '{' ) and the second one
+  % inputs 'cb' and outputs ( '}', '#*c*b*}' ).
+   string2Piece_1(s : string) : Piece =
+   ( cons( IN_1(b),append(map[(Alphabet),PCP_Alphabet](IN_2[PCP_Alphabet])(s), (: IN_1(B) :))) :: list[PCP_Alphabet] ,
+   (: IN_1(b) :) :: list[PCP_Alphabet])
+
+
+  string2Piece_2(s : string) : Piece =
+   ( (: IN_1(e) :) :: list[PCP_Alphabet] ,
+   cons( IN_1(B),append(map[(Alphabet),PCP_Alphabet](IN_3[PCP_Alphabet])(s), (: IN_1(e) :))) :: list[PCP_Alphabet])
+   
+  % Word Problem in Thue System to Post Correspondence Problem
+  TS2pcp(s1,s2: no_empty_string, l :list_no_empty_rr) : (valid_domino?) =
+  append((: string2Piece_1(s1), string2Piece_2(s2) :),
+         append(list_rew_rules2pcp(l), alphabet2domino))
+
+  % From a domino whose pieces have
+  % the form (a/a*) for all 'a' in the
+  % alphabet, it is possible to achieve any instance s/s*,
+  % where 's' is any string.
+  select_from_Alphabet1: LEMMA
+  FORALL(s : list[(Alphabet)]):
+  LET dom = map(letter2Piece_1)(set2list(Alphabet))IN
+  append_domino(dom,
+	 select_from_list(s,set2list(Alphabet))) =
+  (map[(Alphabet),PCP_Alphabet](IN_2[PCP_Alphabet])(s),
+   map[(Alphabet),PCP_Alphabet](IN_3[PCP_Alphabet])(s))
+
+
+  select_from_Alphabet2: LEMMA
+  FORALL(s : list[(Alphabet)]):
+  LET dom = map(letter2Piece_2)(set2list(Alphabet))IN
+  append_domino(dom,
+	 select_from_list(s,set2list(Alphabet))) =
+  (map[(Alphabet),PCP_Alphabet](IN_3[PCP_Alphabet])(s),
+   map[(Alphabet),PCP_Alphabet](IN_2[PCP_Alphabet])(s))
+
+
+  % Concatenating pieces generated from a congruence question
+  % and selected by a list of indices without the first piece.
+  TS2pcp_first : LEMMA
+  FORALL(s0,s1,s2 : no_empty_string, l : list_no_empty_rr,
+  indices : list[below[(length(TS2pcp(s1,s2,l)))]]):
+  (NOT member(0,indices)) =>
+  append_domino(TS2pcp(s0,s2,l),indices) =
+  append_domino(TS2pcp(s1,s2,l),indices)
+
+  % All solutions of a domino set generated by strings 's1'
+  % ,'s2' and a list of rewriting rules 'l' contain the piece
+  % generated by the string 's1', that is represented by
+  % the index '0'.
+  first_piece_sol : LEMMA
+  FORALL(s1,s2 : no_empty_string, l : list_no_empty_rr,
+  indices : (cons?[below[(length(TS2pcp(s1,s2,l)))]])):
+  append_domino(TS2pcp(s1,s2,l),indices)`1 =
+  append_domino(TS2pcp(s1,s2,l),indices)`2 =>
+  member(0,indices)
+
+
+  % The concatenation of a domino sequence that contains the symbol
+  % of begining '{' (in the code, 'bl') in the downside implies that the list
+  % of indices used to select the sequence selects the piece
+  % generated by a string 's1'.
+  TS2pcp_middle1 : LEMMA
+  FORALL( l : list_no_empty_rr, s1, s2 : no_empty_string,
+        L1,L2 : list[PCP_Alphabet],
+	ind: list[below[length(TS2pcp(s1,s2,l))]]) :
+         append(L1,cons(bl, L2)) =
+	 append_domino(TS2pcp(s1,s2,l),ind)`2 =>
+	 member(0,ind)
+
+  % As the previous lemma, the same happens whenever
+  % the symbol '{' (represented by 'bl') appears in
+  % the upside of a domino set concatenation;
+  TS2pcp_middle2 : LEMMA
+  FORALL( l : list_no_empty_rr, s1, s2 : no_empty_string,
+        L1,L2 : list[PCP_Alphabet],
+	ind: list[below[length(TS2pcp(s1,s2,l))]]) :
+         append(L1,cons(bl, L2)) =
+	 append_domino(TS2pcp(s1,s2,l),ind)`1 =>
+	 member(0,ind)
+
+
+  % TS2pcp_middle3 : LEMMA
+  % FORALL( l : list_no_empty_rr, s1, s2 : no_empty_string,
+  %       L1,L2 : list[PCP_Alphabet],
+  % 	ind: list[below[length(TS2pcp(s1,s2,l))]]) :
+  %        append(L1,cons( IN_1[PCP_Alphabet](A) , L2)) =
+  % 	 append_domino(TS2pcp(s1,s2,l),ind)`2 =>
+  % 	 member(3,ind)
+
+
+  
+  suffix_sol : LEMMA
+  FORALL( l : list_no_empty_rr, s1, s2 : no_empty_string):
+  FORALL(ind1,ind2: list[below[length(TS2pcp(s1,s2,l))]]) :
+  (NOT member(0,ind2) AND (
+    suffix?(append_domino(TS2pcp(s1,s2,l),append(ind1,cons(0,ind2)))`1,
+            append_domino(TS2pcp(s1,s2,l),append(ind1,cons(0,ind2)))`2)
+			   OR
+    suffix?(append_domino(TS2pcp(s1,s2,l),append(ind1,cons(0,ind2)))`2,
+            append_domino(TS2pcp(s1,s2,l),append(ind1,cons(0,ind2)))`1)
+			   )) =>
+        append_domino(TS2pcp(s1,s2,l),cons(0,ind2))`1 =
+        append_domino(TS2pcp(s1,s2,l),cons(0,ind2))`2
+
+  % If a domino set has a solution, it has a solution such that
+  % this is minimal, i.e., the first piece (piece generated by 's1')
+  % appears once and only in the begining.
+  a_simplest_dom_sol : LEMMA
+  FORALL( l : list_no_empty_rr, s1, s2 : no_empty_string):
+  domino_solution?(TS2pcp(s1,s2,l)) =>
+  domino_solution_first?(TS2pcp(s1,s2,l),0)
+
+
+  % last_suffix : CONJECTURE
+  % FORALL( l : list_no_empty_rr, s1, s2 : no_empty_string,
+  %         ind: (cons?[below[length(TS2pcp(s1,s2,l))]])):
+  % (suffix?(append_domino(TS2pcp(s1,s2,l),ind)`1,
+  %         append_domino(TS2pcp(s1,s2,l),ind)`2) AND
+  % (NOT member(0,ind))) => rac(ind) = 1
+ 
+
+   suffix_without_firsties : LEMMA
+  FORALL( l : list_no_empty_rr, s1, s2 : no_empty_string,
+          ind1,ind2 : list[below[length(TS2pcp(s1,s2,l))]]):
+	  suffix?(append_domino(TS2pcp(s1,s2,l), append(ind1,ind2))`1,
+	          append_domino(TS2pcp(s1,s2,l), append(ind1,ind2))`2)
+		  =>
+	  suffix?(append_domino(TS2pcp(s1,s2,l), ind2)`1,
+	          append_domino(TS2pcp(s1,s2,l), ind2)`2)
+
+
+
+% suffix_2 : LEMMA
+%    FORALL( l : list_no_empty_rr, s1, s2 : no_empty_string,
+%           ind : list[below[length(TS2pcp(s1,s2,l))]]):
+%        suffix?(append_domino(TS2pcp(s1,s2,l), cons(2,ind))`1,
+% 	       append_domino(TS2pcp(s1,s2,l), cons(2,ind))`2) =>
+% 	       member(3,ind)
+
+
+
+
+% suffix_congruence_induction_basis : CONJECTURE
+% FORALL( l : list_no_empty_rr, s1, s2 : no_empty_string,
+%           ind : (cons?[below[length(TS2pcp(s1,s2,l))]])):
+% 	(  suffix?(append_domino(TS2pcp(s1,s2,l), cons(3,ind))`1,
+% 	          append_domino(TS2pcp(s1,s2,l), cons(3,ind))`2) AND
+% 	  (NOT member(2, ind)) AND (NOT member(0,ind))
+%         ) =>
+% 	TS_congruence_alt(l)
+%                         (map[(IN?_2[PCP_Alphabet]), (Alphabet)]
+%                              (OUT_2)
+%                              (takeWhile[PCP_Alphabet]
+%                                   (IN?_2[PCP_Alphabet])
+%                                   (append_domino(TS2pcp(s1, s2, l),
+%                                                  ind)`2)),
+%                          s2)
+
+
+% suffix_congruence : CONJECTURE
+%   FORALL( l : list_no_empty_rr, s1, s2 : no_empty_string,
+%           ind : (cons?[below[length(TS2pcp(s1,s2,l))]])):
+%   (suffix?(append_domino(TS2pcp(s1,s2,l), ind)`1,
+%           append_domino(TS2pcp(s1,s2,l), ind)`2) AND
+%     NOT member(0,ind)
+%    ) =>(car(ind) = 2 =>
+%         TS_congruence_alt(l)(map[(IN?_3[PCP_Alphabet]),
+% 	  (Alphabet)](OUT_3)(takeWhile[PCP_Alphabet](IN?_3)(
+% 	  append_domino(TS2pcp(s1,s2,l), cdr(ind))`2))
+%    ,s2)) AND
+%    (car(ind) = 3 =>
+%    TS_congruence_alt(l)(map[(IN?_2[PCP_Alphabet]),
+%          (Alphabet)](OUT_2)(takeWhile[PCP_Alphabet](IN?_2[PCP_Alphabet])(
+% 	 append_domino(TS2pcp(s1,s2,l), cdr(ind))`2)),s2) )
+
+
+
+
+  % Any pair of strings congruent modulo some Thue System generates
+  % a domino set that has a solution.
+  congruence_implies_domino_solution: LEMMA
+  FORALL( l : list_no_empty_rr, s1, s2 : no_empty_string):
+  TS_congruence(l)(s1,s2) =>
+  domino_solution?(TS2pcp(s1,s2,l))
+
+  % domino_solution_congruence_implies: CONJECTURE
+  % FORALL( l : list_no_empty_rr, s1, s2 : no_empty_string):
+  % domino_solution?(TS2pcp(s1,s2,l)) =>
+  % TS_congruence(l)(s1,s2)
+
+ % The domino set generated by a question about a congruence over
+ % a Thue System has a solution if and only if the answer of
+ % the question is 'yes'.
+  % TS_pcp : CHALLENGE
+  % FORALL(s1,s2 : no_empty_string, l : list_no_empty_rr):
+  % TS_congruence(l)(s1,s2) <=> domino_solution?(TS2pcp(s1,s2,l))
+  
+
+  END pcp_string_rewriting
+
